@@ -4,19 +4,20 @@
 #include "BLE2902.h"
 #include "BLEHIDDevice.h"
 #include "HIDTypes.h"
+#include "HIDKeyboardTypes.h"
 #include <driver/adc.h>
 #include "sdkconfig.h"
 
 #include "BleConnectionStatus.h"
-#include "KeyboardOutputCallbacks.h"
-#include "BleKeyboard.h"
+#include "KeypadOutputCallbacks.h"
+#include "BleKeypad.h"
 
 #if defined(CONFIG_ARDUHAL_ESP_LOG)
   #include "esp32-hal-log.h"
-  #define LOG_TAG ""
+  #define LOG_TAG "BLEKeypad"
 #else
   #include "esp_log.h"
-  static const char* LOG_TAG = "BLEDevice";
+  static const char* LOG_TAG = "BLEKeypad";
 #endif
 
 
@@ -89,7 +90,7 @@ static const uint8_t _hidReportDescriptor[] = {
   END_COLLECTION(0)                  // END_COLLECTION
 };
 
-BleKeyboard::BleKeyboard(std::string deviceName, std::string deviceManufacturer, uint8_t batteryLevel) : hid(0)
+BleKeyboard::BleKeypad(std::string deviceName, std::string deviceManufacturer, uint8_t batteryLevel) : hid(0)
 {
   this->deviceName = deviceName;
   this->deviceManufacturer = deviceManufacturer;
@@ -97,67 +98,67 @@ BleKeyboard::BleKeyboard(std::string deviceName, std::string deviceManufacturer,
   this->connectionStatus = new BleConnectionStatus();
 }
 
-void BleKeyboard::begin(void)
+void BleKeypad::begin(void)
 {
   xTaskCreate(this->taskServer, "server", 20000, (void *)this, 5, NULL);
 }
 
-void BleKeyboard::end(void)
+void BleKeypad::end(void)
 {
 }
 
-bool BleKeyboard::isConnected(void) {
+bool BleKeypad::isConnected(void) {
   return this->connectionStatus->connected;
 }
 
-void BleKeyboard::setBatteryLevel(uint8_t level) {
+void BleKeypad::setBatteryLevel(uint8_t level) {
   this->batteryLevel = level;
   if (hid != 0)
     this->hid->setBatteryLevel(this->batteryLevel);
 }
 
-void BleKeyboard::taskServer(void* pvParameter) {
-  BleKeyboard* bleKeyboardInstance = (BleKeyboard *) pvParameter; //static_cast<BleKeyboard *>(pvParameter);
-  BLEDevice::init(bleKeyboardInstance->deviceName);
+void BleKeypad::taskServer(void* pvParameter) {
+  BleKeypad* bleKeypadInstance = (BleKeypad *) pvParameter; //static_cast<BleKeyboard *>(pvParameter);
+  BLEDevice::init(bleKeypadInstance->deviceName);
   BLEServer *pServer = BLEDevice::createServer();
-  pServer->setCallbacks(bleKeyboardInstance->connectionStatus);
+  pServer->setCallbacks(bleKeypadInstance->connectionStatus);
 
-  bleKeyboardInstance->hid = new BLEHIDDevice(pServer);
-  bleKeyboardInstance->inputKeyboard = bleKeyboardInstance->hid->inputReport(KEYBOARD_ID); // <-- input REPORTID from report map
-  bleKeyboardInstance->outputKeyboard = bleKeyboardInstance->hid->outputReport(KEYBOARD_ID);
-  bleKeyboardInstance->inputMediaKeys = bleKeyboardInstance->hid->inputReport(MEDIA_KEYS_ID);
-  bleKeyboardInstance->connectionStatus->inputKeyboard = bleKeyboardInstance->inputKeyboard;
-  bleKeyboardInstance->connectionStatus->outputKeyboard = bleKeyboardInstance->outputKeyboard;
-	bleKeyboardInstance->connectionStatus->inputMediaKeys = bleKeyboardInstance->inputMediaKeys;
+  bleKeypadInstance->hid = new BLEHIDDevice(pServer);
+  bleKeypadInstance->inputKeyboard = bleKeypadInstance->hid->inputReport(KEYBOARD_ID); // <-- input REPORTID from report map
+  bleKeypadInstance->outputKeyboard = bleKeypadInstance->hid->outputReport(KEYBOARD_ID);
+  bleKeypadInstance->inputMediaKeys = bleKeypadInstance->hid->inputReport(MEDIA_KEYS_ID);
+  bleKeypadInstance->connectionStatus->inputKeyboard = bleKeypadInstance->inputKeyboard;
+  bleKeypadInstance->connectionStatus->outputKeyboard = bleKeypadInstance->outputKeyboard;
+  bleKeypadInstance->connectionStatus->inputMediaKeys = bleKeypadInstance->inputMediaKeys;
 
-  bleKeyboardInstance->outputKeyboard->setCallbacks(new KeyboardOutputCallbacks());
+  bleKeypadInstance->outputKeyboard->setCallbacks(new KeyboardOutputCallbacks());
 
-  bleKeyboardInstance->hid->manufacturer()->setValue(bleKeyboardInstance->deviceManufacturer);
+  bleKeypadInstance->hid->manufacturer()->setValue(bleKeypadInstance->deviceManufacturer);
 
-  bleKeyboardInstance->hid->pnp(0x02, 0xe502, 0xa111, 0x0210);
-  bleKeyboardInstance->hid->hidInfo(0x00,0x01);
+  bleKeypadInstance->hid->pnp(0x02, 0xe502, 0xa111, 0x0210);
+  bleKeypadInstance->hid->hidInfo(0x00,0x01);
 
   BLESecurity *pSecurity = new BLESecurity();
 
   pSecurity->setAuthenticationMode(ESP_LE_AUTH_BOND);
 
-  bleKeyboardInstance->hid->reportMap((uint8_t*)_hidReportDescriptor, sizeof(_hidReportDescriptor));
-  bleKeyboardInstance->hid->startServices();
+  bleKeypadInstance->hid->reportMap((uint8_t*)_hidReportDescriptor, sizeof(_hidReportDescriptor));
+  bleKeypadInstance->hid->startServices();
 
-  bleKeyboardInstance->onStarted(pServer);
+  bleKeypadInstance->onStarted(pServer);
 
   BLEAdvertising *pAdvertising = pServer->getAdvertising();
   pAdvertising->setAppearance(HID_KEYBOARD);
-  pAdvertising->addServiceUUID(bleKeyboardInstance->hid->hidService()->getUUID());
+  pAdvertising->addServiceUUID(bleKeypadInstance->hid->hidService()->getUUID());
   pAdvertising->setScanResponse(false);
   pAdvertising->start();
-  bleKeyboardInstance->hid->setBatteryLevel(bleKeyboardInstance->batteryLevel);
+  bleKeypadInstance->hid->setBatteryLevel(bleKeypadInstance->batteryLevel);
 
   ESP_LOGD(LOG_TAG, "Advertising started!");
   vTaskDelay(portMAX_DELAY); //delay(portMAX_DELAY);
 }
 
-void BleKeyboard::sendReport(KeyReport* keys)
+void BleKeypad::sendReport(KeyReport* keys)
 {
   if (this->isConnected())
   {
@@ -166,7 +167,7 @@ void BleKeyboard::sendReport(KeyReport* keys)
   }
 }
 
-void BleKeyboard::sendReport(MediaKeyReport* keys)
+void BleKeypad::sendReport(MediaKeyReport* keys)
 {
   if (this->isConnected())
   {
@@ -319,7 +320,7 @@ uint8_t USBPutChar(uint8_t c);
 // to the persistent key report and sends the report.  Because of the way
 // USB HID works, the host acts like the key remains pressed until we
 // call release(), releaseAll(), or otherwise clear the report and resend.
-size_t BleKeyboard::press(uint8_t k)
+size_t BleKeypad::presskey(uint8_t k)
 {
 	uint8_t i;
 	if (k >= 136) {			// it's a non-printing key (not a modifier)
@@ -360,7 +361,7 @@ size_t BleKeyboard::press(uint8_t k)
 	return 1;
 }
 
-size_t BleKeyboard::press(const MediaKeyReport k)
+size_t BleKeypad::presskey(const MediaKeyReport k)
 {
     uint16_t k_16 = k[1] | (k[0] << 8);
     uint16_t mediaKeyReport_16 = _mediaKeyReport[1] | (_mediaKeyReport[0] << 8);
@@ -376,7 +377,7 @@ size_t BleKeyboard::press(const MediaKeyReport k)
 // release() takes the specified key out of the persistent key report and
 // sends the report.  This tells the OS the key is no longer pressed and that
 // it shouldn't be repeated any more.
-size_t BleKeyboard::release(uint8_t k)
+size_t BleKeypad::releasekey(uint8_t k)
 {
 	uint8_t i;
 	if (k >= 136) {			// it's a non-printing key (not a modifier)
@@ -407,7 +408,7 @@ size_t BleKeyboard::release(uint8_t k)
 	return 1;
 }
 
-size_t BleKeyboard::release(const MediaKeyReport k)
+size_t BleKeypad::releasekey(const MediaKeyReport k)
 {
     uint16_t k_16 = k[1] | (k[0] << 8);
     uint16_t mediaKeyReport_16 = _mediaKeyReport[1] | (_mediaKeyReport[0] << 8);
@@ -419,7 +420,7 @@ size_t BleKeyboard::release(const MediaKeyReport k)
 	return 1;
 }
 
-void BleKeyboard::releaseAll(void)
+void BleKeypad::releaseAll(void)
 {
 	_keyReport.keys[0] = 0;
 	_keyReport.keys[1] = 0;
@@ -433,21 +434,21 @@ void BleKeyboard::releaseAll(void)
 	sendReport(&_keyReport);
 }
 
-size_t BleKeyboard::write(uint8_t c)
+size_t BleKeypad::write(uint8_t c)
 {
 	uint8_t p = press(c);  // Keydown
 	release(c);            // Keyup
 	return p;              // just return the result of press() since release() almost always returns 1
 }
 
-size_t BleKeyboard::write(const MediaKeyReport c)
+size_t BleKeypad::write(const MediaKeyReport c)
 {
 	uint16_t p = press(c);  // Keydown
 	release(c);            // Keyup
 	return p;              // just return the result of press() since release() almost always returns 1
 }
 
-size_t BleKeyboard::write(const uint8_t *buffer, size_t size) {
+size_t BleKeypad::write(const uint8_t *buffer, size_t size) {
 	size_t n = 0;
 	while (size--) {
 		if (*buffer != '\r') {
